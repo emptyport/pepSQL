@@ -148,8 +148,6 @@ router.post('/dbcreate', function(req, res, next) {
     return_status.code = 200;
     res.send(return_status)
   });
-
-
 });
 
 module.exports = router;
