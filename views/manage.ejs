@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html>
+  <% include ./partials/head %>
+  <body>
+    <% include ./partials/nav %>
+    <h1><%= title %></h1>
+    <form action="javascript:void(0);">
+        <input id="server_address" placeholder="Server address e.g. 127.0.0.1"/> <br />
+        <input id="server_port" placeholder="Server port e.g. 3306"/> <br />
+        <input id="server_username" placeholder="Username"/> <br />
+        <input id="server_password" placeholder="Password" type="password"/> <br />
+        <button id="manage_submit" onclick="submit_manage_form()">Submit</button>
+    </form>
+  </body>
+</html>
