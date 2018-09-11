@@ -13,5 +13,23 @@ function submit_manage_form() {
     console.log(result);
     alert(result.msg);
   });
- 
 }
+
+$(function() {
+  $('#enzyme-selection').selectize({
+    plugins: ['remove_button']
+  });
+
+  $('.mod-select').selectize({
+    maxItems: 1
+  });
+
+  $('.res-select').selectize({
+    plugins: ['remove_button']
+  });
+});
+
+$(document).ready(function() {
+  document.getElementById("page-container").style.visibility = "visible";
+  document.getElementById("loading").style.visibility = "hidden";
+});

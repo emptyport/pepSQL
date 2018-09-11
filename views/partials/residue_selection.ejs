@@ -1,0 +1,5 @@
+<select class="res-select" multiple placeholder="Select residue(s)">
+    <% for(var i=0; i<residue_list.length; i++) { %>
+        <option value="<%= residue_list[i].value %>"><%= residue_list[i].display %></option>
+    <% } %>
+</select>

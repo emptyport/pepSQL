@@ -2,8 +2,34 @@
 <html>
   <% include ./partials/head %>
   <body>
-    <% include ./partials/nav %>
-    <h1><%= title %></h1>
-    <p>Welcome to <%= title %></p>
+    <div id="loading">
+      Loading...
+    </div>
+    <div id="page-container">
+      <% include ./partials/nav %>
+      <h1><%= title %></h1>
+
+      <select id="enzyme-selection" name="selectedEnzymes[]" multiple placeholder="Select enzymes">
+        <% for(var i=0; i<enzyme_list.length; i++) { %>
+          <option value="<%= enzyme_list[i] %>"><%= enzyme_list[i] %></option>
+        <% } %>
+      </select>
+
+      <table>
+        <tr>
+          <th>Modification</th>
+          <th>Residue(s)</th>
+        </tr>
+        <% for(var i=0; i<5; i++) {%>
+          <tr>
+            <td><% include ./partials/modification_selection %></td>
+            <td><% include ./partials/residue_selection %></td>
+          </tr>
+        <% } %>
+        
+      </table>
+    </div>
+    
+
   </body>
 </html>

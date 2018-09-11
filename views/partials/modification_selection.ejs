@@ -1,0 +1,5 @@
+<select class="mod-select" multiple placeholder="Select modification">
+    <% for(var i=0; i<modification_list.length; i++) { %>
+        <option value="<%= modification_list[i].name %>"><%= modification_list[i].name %> -> <%= modification_list[i].mass %></option>
+    <% } %>
+</select>
