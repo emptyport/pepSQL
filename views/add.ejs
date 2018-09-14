@@ -3,19 +3,59 @@
   <% include ./partials/head %>
   <body>
     <div id="loading">
-      Loading...
+      <% include ./partials/dna_loading %>
     </div>
     <div id="page-container">
       <% include ./partials/nav %>
       <h1><%= title %></h1>
 
-      <select id="enzyme-selection" name="selectedEnzymes[]" multiple placeholder="Select enzymes">
+      <h2>Database information</h2>
+      <input type="text" placeholder="Server address" id="server-address"><br />
+      <input type="text" placeholder="Server port" id="server-port"><br />
+      <input type="text" placeholder="Username" id="server-username"><br />
+      <input type="password" placeholder="Password" id="server-password"><br />
+
+      <h2>Fasta file</h2>
+      <div class="pair">
+        <label for="fastaUpload">Select a fasta file</label>
+        <input id="fastaUpload" type="file" name="fastaUpload">
+      </div>
+      <div class="pair">
+        <label for="organismName">Organism name:</label>
+        <input id="organismName" type="text" name="organismName">
+      </div>
+      <div class="pair">
+        <label for="createDecoys">Append decoys?</label>
+        <input id="createDecoys" type="checkbox" name="createDecoys">
+      </div>
+      <div class="pair">
+        <label for="decoyTag">Decoy tag:</label>
+        <input id="decoyTag" type="text" name="decoyTag">
+      </div>
+
+      <h2>Peptide Properties</h2>
+      <div class="pair">
+        <label for="minLength">Minimum peptide length:</label>
+        <input id="minLength" type="text" name="minLength">
+      </div>
+      <div class="pair">
+        <label for="maxLength">Maximum peptide length:</label>
+        <input id="maxLength" type="text" name="maxLength">
+      </div>
+      <div class="pair">
+        <label for="missedCleavages">Missed cleavages:</label>
+        <input id="missedCleavages" type="text" name="missedCleavages">
+      </div>
+
+      <h2>Select enzyme(s)</h2>
+      <select id="enzyme-selection" name="selectedEnzymes[]" multiple placeholder="Select enzyme(s)">
         <% for(var i=0; i<enzyme_list.length; i++) { %>
           <option value="<%= enzyme_list[i] %>"><%= enzyme_list[i] %></option>
         <% } %>
       </select>
 
-      <table>
+      <h2>Fixed Modifications</h2>
+      <table id="fixedMods">
         <tr>
           <th>Modification</th>
           <th>Residue(s)</th>
@@ -26,10 +66,33 @@
             <td><% include ./partials/residue_selection %></td>
           </tr>
         <% } %>
-        
+      </table>
+
+      <h2>Variable Modifications</h2>
+      <table id="variableMods">
+        <tr>
+          <th>Modification</th>
+          <th>Residue(s)</th>
+        </tr>
+        <% for(var i=0; i<10; i++) {%>
+          <tr>
+            <td><% include ./partials/modification_selection %></td>
+            <td><% include ./partials/residue_selection %></td>
+          </tr>
+        <% } %>
       </table>
     </div>
+
+    <h2>Create</h2>
+    <button class="huge positive ui button" onclick="addEntries()">Create entries</button>
+    <br />
+    <br />
     
 
   </body>
+  <script>
+    $('#home-nav').removeClass('active');
+    $('#add-nav').addClass('active');
+    $('#manage-nav').removeClass('active');
+  </script>
 </html>

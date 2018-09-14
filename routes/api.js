@@ -1,19 +1,104 @@
 var unimod = require('js-unimod');
 var express = require('express');
 var router = express.Router();
+var mysql = require('mysql');
+var fastaParser = require('fasta-js');
+let Q = require('q');
+
+function addOrganism(organism) {
+  let deferred = Q.defer();
+  console.log(organism);
+  deferred.resolve(1);
+  return deferred.promise;
+}
+
+function addProtein(protein) {
+  let deferred = Q.defer();
+  console.log(protein);
+  deferred.resolve("success");
+  return deferred.promise;
+}
 
 async function runCreationCommand(connection, cmd) {
   await connection.query(cmd, function (error, results, fields) {
     if (error) return false;
-    console.log(results);
     return true;
   });
 }
 
+router.post('/add', function(req, res, next) {
+  let return_status = {
+    msg: 'Unknown failure',
+    status: 400
+  };
+
+  var connection = mysql.createConnection({
+    host     : req.body.server_address,
+    port     : req.body.server_port,
+    user     : req.body.server_username,
+    password : req.body.server_password,
+    database : 'pepDB'
+  });
+
+  connection.connect(function(err) {
+    if (err) {
+      return_status.msg = "Error connecting to MySQL database: "+err.stack;
+      res.send(return_status);
+      return;
+    }
+    console.log('connected as id ' + connection.threadId);
+
+    let fastaOptions = {
+      'definition': 'gi|accession|description',
+      'delimiter': '|'
+    };
+
+    // Add the organism
+    let organismSQL = 'INSERT INTO organisms (organism) VALUES(?)';
+    connection.query(organismSQL, [req.body.organismName], function(error, results, fields) {
+      if(error) throw error;
+      console.log("results");
+      console.log(results);
+      console.log("fields");
+      console.log(fields);
+    });
+
+    let fasta = new fastaParser(fastaOptions);
+    let sequences = fasta.parse(req.body.fastaData);
+
+    addOrganism('yeast').then(addProtein('hello protein'));
+
+    connection.end();
+    return_status.msg = 'Process complete';
+    return_status.status = 200;
+    res.send(return_status);
+    return;
+  });
+});
+
+router.post('/truncate', function(req, res, next) {
+  var connection = mysql.createConnection({
+    host     : req.body.server_address,
+    port     : req.body.server_port,
+    user     : req.body.server_username,
+    password : req.body.server_password,
+    database : 'pepDB',
+    multipleStatements: true
+  });
+  let query = 'TRUNCATE TABLE peptides; TRUNCATE TABLE sequences; TRUNCATE TABLE proteins; TRUNCATE TABLE modMap; TRUNCATE TABLE organisms; TRUNCATE TABLE enzymes; TRUNCATE TABLE unimod;';
+  connection.query(query, function (error, results, fields) {
+    if (error) {
+      console.log(error);
+      res.send({status: 400});
+      return;
+    };
+    res.send({status: 200});
+  });
+});
+
 router.post('/dbcreate', function(req, res, next) {
   // Setting up the connection to MySQL
   console.log(req.body);
-  var mysql      = require('mysql');
   var connection = mysql.createConnection({
     host     : req.body.server_address,
     port     : req.body.server_port,
@@ -55,7 +140,7 @@ router.post('/dbcreate', function(req, res, next) {
 
     // Now let's create the sequences table
     let sequences_creation_command = 
-      `CREATE TABLE \`pepDB\`.\`peptides\` (
+      `CREATE TABLE \`pepDB\`.\`sequences\` (
       \`seqID\` INT NOT NULL AUTO_INCREMENT,
       \`sequence\` VARCHAR(100) NOT NULL,
       \`start\` INT NOT NULL,
@@ -144,10 +229,38 @@ router.post('/dbcreate', function(req, res, next) {
     }
     console.log('Created organisms table');
 
-    connection.end();
-    return_status.msg = 'Database ready';
-    return_status.code = 200;
-    res.send(return_status)
+    // Adding the enzymes
+    let enzymes = require('../assets/enzymes').enzymes;
+    let enzymeQueryList = enzymes.map((e) => {
+      return '(\''+e+'\')';
+    });
+    let enzymeSQL = 'INSERT INTO enzymes (enzyme) VALUES '+enzymeQueryList.join(",");
+    runCreationCommand(connection, enzymeSQL);
+    console.log('Populated enzymes table');
+
+    let modNames = unimod.listMods();
+    let modQueryList = modNames.map((m) => {
+      let mod = unimod.getByName(m);
+      return '(\''+m+'\',\''+mod.mono_mass+'\')';
+    });
+    let modSQL = 'INSERT INTO unimod (name, massShift) VALUES '+modQueryList.join(',');
+    runCreationCommand(connection, modSQL);
+    console.log('Populated unimod table');
+
+    
+    connection.end(function(err) {
+      if (err) {
+        return_status.msg = "Error closing connection";
+        return return_status;
+      }
+      return_status.msg = 'Database ready';
+      return_status.code = 200;
+      res.send(return_status);
+    });
+    
+    
+
+    
   });
 });
 

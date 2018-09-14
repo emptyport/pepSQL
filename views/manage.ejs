@@ -9,7 +9,12 @@
         <input id="server_port" placeholder="Server port e.g. 3306"/> <br />
         <input id="server_username" placeholder="Username"/> <br />
         <input id="server_password" placeholder="Password" type="password"/> <br />
-        <button id="manage_submit" onclick="submit_manage_form()">Submit</button>
+        <button id="manage_submit" onclick="submitManageForm()">Submit</button>
     </form>
   </body>
+  <script>
+    $('#home-nav').removeClass('active');
+    $('#add-nav').removeClass('active');
+    $('#manage-nav').addClass('active');
+  </script>
 </html>

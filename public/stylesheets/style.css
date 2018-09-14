@@ -10,3 +10,27 @@ body {
 a {
   color: #00B7FF;
 }
+
+table {
+  width: 100%;
+}
+
+.pair {
+  padding-top: 6px;
+  padding-bottom: 6px;
+  display: grid;
+  grid-template-columns: 25% auto;
+}
+
+.pair label {
+  padding-right: 1em;
+  justify-self: end;
+}
+
+.pair input[type=text] {
+  border: 1px solid #d0d0d0;
+  border-radius: 3px;
+  font-size: 13px;
+  color: #303030;
+  line-height: 18px;
+}

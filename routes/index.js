@@ -13,42 +13,7 @@ for(let i=0; i<modification_names.length; i++) {
   });
 }
 
-let enzymes = [
-  "arg-c",
-  "asp-n",
-  "bnps-skatole",
-  "caspase 1",
-  "caspase 2",
-  "caspase 3",
-  "caspase 4",
-  "caspase 5",
-  "caspase 6",
-  "caspase 7",
-  "caspase 8",
-  "caspase 9",
-  "caspase 10",
-  "chymotrypsin high specificity",
-  "chymotrypsin low specificity",
-  "clostripain",
-  "cnbr",
-  "enterokinase",
-  "factor xa",
-  "formic acid",
-  "glutamyl endopeptidase",
-  "granzyme b",
-  "hydroxylamine",
-  "iodoxobenzoic acid",
-  "lysc",
-  "ntcb",
-  "pepsin ph1.3",
-  "pepsin ph2.0",
-  "proline endopeptidase",
-  "proteinase k",
-  "staphylococcal peptidase i",
-  "thermolysin",
-  "thrombin",
-  "trypsin"
-];
+let enzymes = require('../assets/enzymes').enzymes;
 
 let amino_acids = [
   'A',

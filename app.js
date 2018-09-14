@@ -1,8 +1,9 @@
-var createError = require('http-errors');
 var express = require('express');
 var path = require('path');
 var cookieParser = require('cookie-parser');
+var bodyParser = require('body-parser');
 var logger = require('morgan');
+var http = require('http');
 
 var indexRouter = require('./routes/index');
 var apiRouter = require('./routes/api');
@@ -13,6 +14,8 @@ var app = express();
 app.set('views', path.join(__dirname, 'views'));
 app.set('view engine', 'ejs');
 
+
+app.use(bodyParser({limit: '1024mb'}));
 app.use(logger('dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
@@ -21,6 +24,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 app.use('/', indexRouter);
 app.use('/api', apiRouter);
+
 
 // catch 404 and forward to error handler
 app.use(function(req, res, next) {
@@ -38,4 +42,9 @@ app.use(function(err, req, res, next) {
   res.render('error');
 });
 
-module.exports = app;
+var port = process.env.PORT || 3000;
+app.set('port', port);
+
+var server = http.createServer(app);
+console.log('Listening on port '+port);
+server.listen(port);
