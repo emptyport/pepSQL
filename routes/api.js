@@ -76,7 +76,7 @@ router.post('/add', function(req, res, next) {
   });
 });
 
-router.post('/truncate', function(req, res, next) {
+router.post('/delete', function(req, res, next) {
   var connection = mysql.createConnection({
     host     : req.body.server_address,
     port     : req.body.server_port,
