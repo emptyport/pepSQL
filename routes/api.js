@@ -85,7 +85,7 @@ router.post('/truncate', function(req, res, next) {
     database : 'pepDB',
     multipleStatements: true
   });
-  let query = 'TRUNCATE TABLE peptides; TRUNCATE TABLE sequences; TRUNCATE TABLE proteins; TRUNCATE TABLE modMap; TRUNCATE TABLE organisms; TRUNCATE TABLE enzymes; TRUNCATE TABLE unimod;';
+  let query = 'SET FOREIGN_KEY_CHECKS = 0; DROP TABLE modMap; DROP TABLE unimod; DROP TABLE peptides; DROP TABLE sequences; DROP TABLE proteins; DROP TABLE organisms; DROP TABLE enzymes; SET FOREIGN_KEY_CHECKS = 1;';
   connection.query(query, function (error, results, fields) {
     if (error) {
       console.log(error);
@@ -131,7 +131,7 @@ router.post('/dbcreate', function(req, res, next) {
       \`seqID\` INT NOT NULL,
       \`organismID\` INT NOT NULL,
       PRIMARY KEY (\`pepID\`, \`mass\`),
-      UNIQUE INDEX \`pepID_UNIQUE\` (\`pepID\` ASC)))`;
+      UNIQUE INDEX \`pepID_UNIQUE\` (\`pepID\` ASC))`;
     if(!runCreationCommand(connection, peptides_creation_command)) {
       return_status.msg = 'Error creating peptides table';
       res.send(return_status);
@@ -238,6 +238,7 @@ router.post('/dbcreate', function(req, res, next) {
     runCreationCommand(connection, enzymeSQL);
     console.log('Populated enzymes table');
 
+    // Adding the modifications w/ masses
     let modNames = unimod.listMods();
     let modQueryList = modNames.map((m) => {
       let mod = unimod.getByName(m);
@@ -247,6 +248,67 @@ router.post('/dbcreate', function(req, res, next) {
     runCreationCommand(connection, modSQL);
     console.log('Populated unimod table');
 
+    // Now we create the foreign keys
+    let fkSQL = 
+      `ALTER TABLE peptides
+      ADD CONSTRAINT FK_pepToSeq
+      FOREIGN KEY (seqID) REFERENCES sequences(seqID)`;
+    if(!runCreationCommand(connection, fkSQL)) {
+      return_status.msg = 'Error creating pepToSeq FK';
+      res.send(return_status);
+    }
+    console.log('Created peptides to sequences foreign key');
+
+    fkSQL = 
+    `ALTER TABLE peptides
+    ADD CONSTRAINT FK_pepToEnz
+    FOREIGN KEY (enzymeID) REFERENCES enzymes(enzymeID)`;
+    if(!runCreationCommand(connection, fkSQL)) {
+      return_status.msg = 'Error creating pepToEnz FK';
+      res.send(return_status);
+    }
+    console.log('Created peptides to enzymes foreign key');
+
+
+    fkSQL = 
+    `ALTER TABLE peptides
+    ADD CONSTRAINT FK_pepToOrg
+    FOREIGN KEY (organismID) REFERENCES organisms(organismID)`;
+    if(!runCreationCommand(connection, fkSQL)) {
+      return_status.msg = 'Error creating pepToOrg FK';
+      res.send(return_status);
+    }
+    console.log('Created peptides to organisms foreign key');
+
+    fkSQL = 
+    `ALTER TABLE sequences
+    ADD CONSTRAINT FK_seqToProt
+    FOREIGN KEY (protID) REFERENCES proteins(protID)`;
+    if(!runCreationCommand(connection, fkSQL)) {
+      return_status.msg = 'Error creating seqToProt FK';
+      res.send(return_status);
+    }
+    console.log('Created sequences to proteins foreign key');
+
+    fkSQL = 
+    `ALTER TABLE modMap
+    ADD CONSTRAINT FK_modToPep
+    FOREIGN KEY (pepID) REFERENCES peptides(pepID)`;
+    if(!runCreationCommand(connection, fkSQL)) {
+      return_status.msg = 'Error creating modToPep FK';
+      res.send(return_status);
+    }
+    console.log('Created modMap to peptides foreign key');
+
+    fkSQL = 
+    `ALTER TABLE modMap
+    ADD CONSTRAINT FK_modToMod
+    FOREIGN KEY (modID) REFERENCES unimod(modID)`;
+    if(!runCreationCommand(connection, fkSQL)) {
+      return_status.msg = 'Error creating modToMod FK';
+      res.send(return_status);
+    }
+    console.log('Created modMap to unimod foreign key');
     
     connection.end(function(err) {
       if (err) {
