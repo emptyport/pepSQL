@@ -1,9 +1,12 @@
-var unimod = require('js-unimod');
-var express = require('express');
-var router = express.Router();
-var mysql = require('mysql');
-var fastaParser = require('fasta-js');
+let unimod = require('js-unimod');
+let express = require('express');
+let router = express.Router();
+let mysql = require('mysql');
+let fastaParser = require('fasta-js');
+let peptideCutter = require('peptide-cutter');
 let Q = require('q');
+
+const BATCH_SIZE = 5000;
 
 function addOrganism(organism) {
   let deferred = Q.defer();
@@ -24,6 +27,122 @@ async function runCreationCommand(connection, cmd) {
     if (error) return false;
     return true;
   });
+}
+
+function cleanUp(connection, res) {
+  let return_status = {};
+  connection.end(function(err) {
+    if (err) {
+      return_status.msg = "Error closing connection";
+      return_status.status = 400;
+      return return_status;
+    }
+    console.log("\nDone!\n");
+    return_status.msg = 'Process complete';
+    return_status.status = 200;
+    res.send(return_status);
+  });
+}
+
+function processFasta(connection, data, res) {
+  let deferred = Q.defer();
+  let fastaOptions = {
+    'definition': 'gi|accession|description',
+    'delimiter': '|'
+  };
+  let fasta = new fastaParser(fastaOptions);
+  let sequences = fasta.parse(data.fastaData);
+  delete data.fastaData;
+  let length = sequences.length;
+  for(let i=0; i<length; i++) {
+    createEntries(res, connection, data, sequences[i], false)
+    .then(function() {
+      console.log('finished '+i);
+      if(i===length-1 && data.createDecoys !== 'true') { cleanUp(connection, res); deferred.resolve(); }
+    });
+    if(data.createDecoys === 'true') {
+      createEntries(res, connection, data, sequences[i], true)
+      .then(function() {
+        console.log('finished decoy '+i);
+        if(i===length-1) { cleanUp(connection, res); deferred.resolve(); }
+      });
+    }
+  }
+  return deferred.promise;
+}
+
+function createEntries(res, connection, data, sequenceData, shouldCreateDecoy) {
+  let return_status = {
+    'msg':'Error creating entries',
+    'code': 400
+  }
+  let deferred = Q.defer();
+  let sequence = sequenceData.sequence;
+  let description = sequenceData.description;
+  let accession = sequenceData.accession;
+  if(shouldCreateDecoy) {
+    accession = accession + data.decoyTag;
+    sequence = sequence.split("").reverse().join("");
+  }
+  let proteinSQL = 'INSERT INTO proteins (accession, description) VALUES (\''+accession+'\','+connection.escape(description)+')';
+  connection.query(proteinSQL, function(error, results, fields) {
+    if(error) {
+      console.log(error);
+      return_status.msg = "Error adding protein "+accession;
+      res.send(return_status);
+      return;
+    };
+    proteinID = results['insertId'];
+
+    let minLength = parseInt(data.minLength);
+    let maxLength = parseInt(data.maxLength);
+    let allowedMissed = parseInt(data.missedCleavages);
+    let enzymes = data.enzymeList;
+    for(let i=0; i<enzymes.length; i++) {
+      let enzyme = enzymes[i];
+      let options = {
+        enzyme: enzyme,
+        num_missed_cleavages: allowedMissed,
+        min_length: minLength,
+        max_length: maxLength
+      };
+      let cutter = new peptideCutter(options);
+      let peptides = cutter.cleave(sequence);
+      for(let j=0; j<peptides.length; j++) {
+        let pepSeq = peptides[j].sequence;
+        let pepStart = peptides[j].start;
+        let pepEnd = peptides[j].end;
+        let pepMissed = peptides[j].missed;
+        let pepLength = pepSeq.length;
+        let prevAA = '.';
+        let nextAA = '.';
+        if(pepStart>0) { prevAA = sequence[pepStart-1]; }
+        if(pepEnd<sequence.length-1) { nextAA = sequence[pepEnd+1]; }
+        let sequenceSQL = `INSERT INTO sequences (sequence, start, end, length, previousAA, nextAA, protID) VALUES ('${pepSeq}','${pepStart}','${pepEnd}','${pepLength}','${prevAA}','${nextAA}','${proteinID}');`;
+        connection.query(sequenceSQL, function(seqError, seqResults) {
+          if(seqError) {
+            console.log(seqError);
+            console.log(sequenceSQL);
+            return_status.msg = "Error adding sequence "+pepSeq;
+            res.send(return_status);
+            return;
+          }
+          seqID = seqResults['insertId'];
+          console.log(seqID);
+          deferred.resolve();
+
+        });
+      }
+
+
+    }
+
+
+
+  });
+  
+
+  return deferred.promise;
 }
 
 router.post('/add', function(req, res, next) {
@@ -48,30 +167,24 @@ router.post('/add', function(req, res, next) {
     }
     console.log('connected as id ' + connection.threadId);
 
-    let fastaOptions = {
-      'definition': 'gi|accession|description',
-      'delimiter': '|'
-    };
+
 
     // Add the organism
     let organismSQL = 'INSERT INTO organisms (organism) VALUES(?)';
     connection.query(organismSQL, [req.body.organismName], function(error, results, fields) {
-      if(error) throw error;
-      console.log("results");
-      console.log(results);
-      console.log("fields");
-      console.log(fields);
+      if(error) {
+        return_status.msg = "Error adding organism";
+        res.send(return_status);
+        return;
+      };
+      req.body.organismID = results['insertId'];
+      
+      processFasta(connection, req.body, res)
+      .then(function() {
+        console.log("nearly done");
+      });
     });
-
-    let fasta = new fastaParser(fastaOptions);
-    let sequences = fasta.parse(req.body.fastaData);
-
-    addOrganism('yeast').then(addProtein('hello protein'));
-
-    connection.end();
-    return_status.msg = 'Process complete';
-    return_status.status = 200;
-    res.send(return_status);
+    
     return;
   });
 });
