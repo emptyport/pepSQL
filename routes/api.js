@@ -2,6 +2,7 @@ let unimod = require('js-unimod');
 let express = require('express');
 let router = express.Router();
 let mysql = require('mysql');
+let syncMysql = require('sync-mysql');
 let fastaParser = require('fasta-js');
 let peptideCutter = require('peptide-cutter');
 let Q = require('q');
@@ -44,7 +45,7 @@ function cleanUp(connection, res) {
   });
 }
 
-function processFasta(connection, data, res) {
+function processFasta(connection, data, res, dbEnzymes, dbMods) {
   let deferred = Q.defer();
   let fastaOptions = {
     'definition': 'gi|accession|description',
@@ -55,13 +56,13 @@ function processFasta(connection, data, res) {
   delete data.fastaData;
   let length = sequences.length;
   for(let i=0; i<length; i++) {
-    createEntries(res, connection, data, sequences[i], false)
+    createEntries(res, connection, data, sequences[i], false, dbEnzymes, dbMods)
     .then(function() {
       console.log('finished '+i);
       if(i===length-1 && data.createDecoys !== 'true') { cleanUp(connection, res); deferred.resolve(); }
     });
     if(data.createDecoys === 'true') {
-      createEntries(res, connection, data, sequences[i], true)
+      createEntries(res, connection, data, sequences[i], true, dbEnzymes, dbMods)
       .then(function() {
         console.log('finished decoy '+i);
         if(i===length-1) { cleanUp(connection, res); deferred.resolve(); }
@@ -71,11 +72,12 @@ function processFasta(connection, data, res) {
   return deferred.promise;
 }
 
-function createEntries(res, connection, data, sequenceData, shouldCreateDecoy) {
+function createEntries(res, connection, data, sequenceData, shouldCreateDecoy, dbEnzymes, dbMods) {
   let return_status = {
     'msg':'Error creating entries',
     'code': 400
   }
+
   let deferred = Q.defer();
   let sequence = sequenceData.sequence;
   let description = sequenceData.description;
@@ -128,7 +130,11 @@ function createEntries(res, connection, data, sequenceData, shouldCreateDecoy) {
             return;
           }
           seqID = seqResults['insertId'];
-          console.log(seqID);
+          
+
+
+
+
           deferred.resolve();
 
         });
@@ -159,6 +165,29 @@ router.post('/add', function(req, res, next) {
     database : 'pepDB'
   });
 
+  let syncConnection = new syncMysql({
+    host     : req.body.server_address,
+    port     : req.body.server_port,
+    user     : req.body.server_username,
+    password : req.body.server_password,
+    database : 'pepDB'
+  });
+  let dbEnzymesRaw = syncConnection.query('SELECT * from enzymes;');
+  let dbEnzymes = {};
+  for(let i=0; i<dbEnzymesRaw.length; i++) {
+    let name = dbEnzymesRaw[i].enzyme;
+    let id = dbEnzymesRaw[i].enzymeID;
+    dbEnzymes[name] = id;
+  }
+
+  let dbModsRaw = syncConnection.query('SELECT * from unimod;');
+  let dbMods = {};
+  for(let i=0; i<dbModsRaw.length; i++) {
+    let name = dbModsRaw[i].name;
+    let id = dbModsRaw[i].modID;
+    dbMods[name] = id;
+  }
+  
   connection.connect(function(err) {
     if (err) {
       return_status.msg = "Error connecting to MySQL database: "+err.stack;
@@ -179,7 +208,7 @@ router.post('/add', function(req, res, next) {
       };
       req.body.organismID = results['insertId'];
       
-      processFasta(connection, req.body, res)
+      processFasta(connection, req.body, res, dbEnzymes, dbMods)
       .then(function() {
         console.log("nearly done");
       });
