@@ -1,0 +1,34 @@
+{ 
+    "server_address": "localhost",
+    "server_port": "3306",
+    "server_username": "pepDB",
+    "server_password": "password",
+    "db_name": "pepDB",
+    "fastaFiles": 
+        [
+            {
+                "organism": "yeast",
+                "file": "/home/mike/Downloads/yeast_uniprot-proteome%3AUP000002311.fasta"
+            }
+        ],
+    "createDecoys": true,
+    "decoyTag": "_REVERSED",
+    "minLength": 6,
+    "maxLength": 30,
+    "missedCleavages": 0,
+    "enzymes": [ "trypsin" ],
+    "numVariableMods": 3,
+    "mods": 
+        [ 
+            { 
+                "name": "carbamidomethyl",
+                "residues": ["C"],
+                "type": "fixed"
+            },
+            {
+                "name": "oxidation",
+                "residues": ["M"],
+                "type": "variable"
+            }
+        ]
+  }

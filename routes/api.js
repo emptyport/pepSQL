@@ -8,32 +8,7 @@ let peptideCutter = require('peptide-cutter');
 const BATCH_SIZE = 5000;
 
 /*
-function processFasta(connection, data, res, dbEnzymes, dbMods) {
-  let deferred = Q.defer();
-  let fastaOptions = {
-    'definition': 'gi|accession|description',
-    'delimiter': '|'
-  };
-  let fasta = new fastaParser(fastaOptions);
-  let sequences = fasta.parse(data.fastaData);
-  delete data.fastaData;
-  let length = sequences.length;
-  for(let i=0; i<length; i++) {
-    createEntries(res, connection, data, sequences[i], false, dbEnzymes, dbMods)
-    .then(function() {
-      console.log('finished '+i);
-      if(i===length-1 && data.createDecoys !== 'true') { cleanUp(connection, res); deferred.resolve(); }
-    });
-    if(data.createDecoys === 'true') {
-      createEntries(res, connection, data, sequences[i], true, dbEnzymes, dbMods)
-      .then(function() {
-        console.log('finished decoy '+i);
-        if(i===length-1) { cleanUp(connection, res); deferred.resolve(); }
-      });
-    }
-  }
-  return deferred.promise;
-}
+
 
 function createEntries(res, connection, data, sequenceData, shouldCreateDecoy, dbEnzymes, dbMods) {
   let return_status = {
@@ -59,30 +34,7 @@ function createEntries(res, connection, data, sequenceData, shouldCreateDecoy, d
     };
     proteinID = results['insertId'];
 
-    let minLength = parseInt(data.minLength);
-    let maxLength = parseInt(data.maxLength);
-    let allowedMissed = parseInt(data.missedCleavages);
-    let enzymes = data.enzymeList;
-    for(let i=0; i<enzymes.length; i++) {
-      let enzyme = enzymes[i];
-      let options = {
-        enzyme: enzyme,
-        num_missed_cleavages: allowedMissed,
-        min_length: minLength,
-        max_length: maxLength
-      };
-      let cutter = new peptideCutter(options);
-      let peptides = cutter.cleave(sequence);
-      for(let j=0; j<peptides.length; j++) {
-        let pepSeq = peptides[j].sequence;
-        let pepStart = peptides[j].start;
-        let pepEnd = peptides[j].end;
-        let pepMissed = peptides[j].missed;
-        let pepLength = pepSeq.length;
-        let prevAA = '.';
-        let nextAA = '.';
-        if(pepStart>0) { prevAA = sequence[pepStart-1]; }
-        if(pepEnd<sequence.length-1) { nextAA = sequence[pepEnd+1]; }
+    
         let sequenceSQL = `INSERT INTO sequences (sequence, start, end, length, previousAA, nextAA, protID) VALUES ('${pepSeq}','${pepStart}','${pepEnd}','${pepLength}','${prevAA}','${nextAA}','${proteinID}');`;
         connection.query(sequenceSQL, function(seqError, seqResults) {
           if(seqError) {
@@ -115,6 +67,44 @@ function createEntries(res, connection, data, sequenceData, shouldCreateDecoy, d
 }
 */
 
+function processProtein(fastaEntry, isDecoy, data) {
+  let proteinList = [];
+  let sequenceList = [];
+  let peptideList = [];
+  let modList = [];
+
+  let sequence = fastaEntry.sequence;
+  let accession = fastaEntry.accession;
+  let description = fastaEntry.description;
+  if(isDecoy) {
+    sequence = sequence.split("").reverse().join("");
+    accession = accession + data.decoyTag;
+  }
+
+  proteinList.push({
+    accession: accession,
+    description: description
+  });
+
+  let minLength = parseInt(data.minLength);
+  let maxLength = parseInt(data.maxLength);
+  let allowedMissed = parseInt(data.missedCleavages);
+  let enzymes = data.enzymeList;
+  for(let i=0; i<enzymes.length; i++) {
+    let enzyme = enzymes[i];
+    let options = {
+      enzyme: enzyme,
+      num_missed_cleavages: allowedMissed,
+      min_length: minLength,
+      max_length: maxLength
+    };
+    let cutter = new peptideCutter(options);
+    let digestedSequences = cutter.cleave(sequence);
+    sequenceList.push(digestedSequences);
+    
+  }
+}
+
 router.post('/add', function(req, res, next) {
 
   let connection = new mysql({
@@ -145,7 +135,72 @@ router.post('/add', function(req, res, next) {
   let organismSQL = 'INSERT INTO organisms (organism) VALUES(?)';
   let organismResults = connection.query(organismSQL, [req.body.organismName]);
   req.body.organismID = organismResults['insertId'];
-  console.log(req.body.organismID);
+
+  let fastaOptions = {
+    'definition': 'gi|accession|description',
+    'delimiter': '|'
+  };
+  let fasta = new fastaParser(fastaOptions);
+  let sequences = fasta.parse(req.body.fastaData);
+  let length = sequences.length;
+  delete req.body.fastaData;
+
+  const TOTAL = req.body.enzymeList.length * length;
+
+  let proteinQueue = [];
+  let sequenceQueue = [];
+  let peptideQueue = [];
+  let modQueue = [];
+
+  for(let i=0; i<length; i++) {
+    let sequence = sequences[i];
+    let dataToAdd = processProtein(sequence, false, req.body);
+    proteinQueue.push(dataToAdd.proteins);
+    sequenceQueue.push(dataToAdd.sequences);
+    peptideQueue.push(dataToAdd.peptides);
+    modQueue.push(dataToAdd.mods);
+
+    if(req.body.createDecoys === 'true') {
+      let dataToAdd = processProtein(sequence, true, req.body);
+      proteinQueue.push(dataToAdd.proteins);
+      sequenceQueue.push(dataToAdd.sequences);
+      peptideQueue.push(dataToAdd.peptides);
+      modQueue.push(dataToAdd.mods);
+    }
+    
+    let enzymes = req.body.enzymeList;
+    for(let j=0; j<enzymes.length; j++) {
+      let enzyme = enzymes[j];
+      let options = {
+        enzyme: enzyme,
+        num_missed_cleavages: allowedMissed,
+        min_length: minLength,
+        max_length: maxLength
+      };
+      let cutter = new peptideCutter(options);
+      let digestedSequences = cutter.cleave(seq);
+      sequenceQueue.push(digestedSequences);
+      if(req.body.createDecoys === 'true') {
+        reversedDigestedSequences = cutter.cleave(seq.split("").reverse().join(""));
+        sequenceQueue.push(reversedDigestedSequences);
+        digestedSequences = digestedSequences.concat(reversedDigestedSequences);
+      }
+
+
+
+
+      for(let k=0; k<peptides.length; k++) {
+        let pepSeq = peptides[k].sequence;
+        let pepStart = peptides[k].start;
+        let pepEnd = peptides[k].end;
+        let pepMissed = peptides[k].missed;
+        let pepLength = pepSeq.length;
+        let prevAA = '.';
+        let nextAA = '.';
+        if(pepStart>0) { prevAA = sequence[pepStart-1]; }
+        if(pepEnd<sequence.length-1) { nextAA = sequence[pepEnd+1]; }
+
+  }
       
   let return_status = {};
   return_status.msg = "Process complete";
