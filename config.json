@@ -3,12 +3,13 @@
     "server_port": "3306",
     "server_username": "pepDB",
     "server_password": "password",
+    "table_name": "chicken",
     "db_name": "pepDB",
     "fastaFiles": 
         [
             {
-                "organism": "yeast",
-                "file": "/home/mike/Downloads/yeast_uniprot-proteome%3AUP000002311.fasta"
+                "organism": "chicken",
+                "file": "/home/mike/github/bootleg/chicken.fasta"
             }
         ],
     "createDecoys": true,
@@ -17,7 +18,7 @@
     "maxLength": 30,
     "missedCleavages": 0,
     "enzymes": [ "trypsin" ],
-    "numVariableMods": 3,
+    "numVariableMods": 2,
     "mods": 
         [ 
             { 
@@ -29,6 +30,16 @@
                 "name": "oxidation",
                 "residues": ["M"],
                 "type": "variable"
+            },
+            {
+                "name": "glu->pyro-glu",
+                "residues": ["[E"],
+                "type": "variable"
+            },
+            {
+                "name": "gln->pyro-glu",
+                "residues": ["[Q"],
+                "type": "variable"
             }
         ]
-  }
+}
